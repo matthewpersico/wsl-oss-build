@@ -1,0 +1,47 @@
+# -*- sh -*-
+# shellcheck shell=bash
+# shellcheck disable=SC2155 #https://github.com/koalaman/shellcheck/wiki/SC2155
+
+declare ceid=$(basename "$0")
+declare this=$(realpath "$0")
+declare startdir=$(pwd)
+# shellcheck disable=SC2001 #https://github.com/koalaman/shellcheck/wiki/SC2001
+declare version=$(echo "$1" | sed 's|/$||')
+if [[ -n $1 ]]; then
+    cd "$version" || exit
+    export INTLFONTS_BUILDIT_VERSION=$version
+    export INTLFONTS_BUILDIT_DIR=$(pwd)
+    logit --tee --teedir "$startdir" --teeppid $PPID "$this"
+else
+    # cd down to maj.min.patch dir
+    cd "$INTLFONTS_BUILDIT_DIR" || exit
+
+    # This is the intlfonts-maj.min dir. Create by expanding the tarball.
+    declare source_dir="intlfonts-$INTLFONTS_BUILDIT_VERSION"
+    if [[ ! -d $source_dir ]]; then
+        declare tarball="${source_dir}.tar.gz"
+        if ! tar zxvf "$tarball"; then
+            false; exit;
+        fi
+    else
+        cmd-echo --id "$ceid" "$tarball already expanded."
+    fi
+
+    # Now in the source dir (expansion of the tarball).
+    cd "$source_dir" || exit
+
+    # Build
+    declare -a config_args=(
+        --with-fontdir="$OPTFONTS"
+    )
+    if iswsl; then
+        config_args+=(
+            --with-type1=yes
+            --with-truetype=yes
+        )
+    fi
+
+    ./configure "${config_args[@]}" || exit
+
+    make install
+fi
